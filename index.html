@@ -40,7 +40,12 @@
       // Create a layer group for city markers
         var cityMarkers = L.layerGroup().addTo(map);
 
-     
+     // Create a green dot icon
+        var greenIcon = L.divIcon({
+            className: 'custom-icon',
+            html: '<div style="background-color: green; width: 10px; height: 10px; border-radius: 50%;"></div>'
+        });
+        
         // Function to read CSV data and create markers
         function addMarkersFromCSV(csvData) {
             Papa.parse(csvData, {
@@ -73,7 +78,7 @@
                         }
 
                         // Create a single marker per city with aggregated mode information
-                        var marker = L.marker(cities[city].coordinates).bindPopup(`
+                        var marker = L.marker(cities[city].coordinates, {icon: greenIcon}).bindPopup(`
                             <b>${city}</b><br>
                             ${modesInfo}
                         `);
