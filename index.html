@@ -18,42 +18,128 @@
     <!-- Include PapaParse library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
-    <!-- Include CSS for map height and other styles -->
+    <!-- CSS for map height and other styles -->
     <style>
         #map { height: 620px; }
-        .custom-icon { background-color: green; width: 10px; height: 10px; border-radius: 50%; }
+        .custom-icon { background-color: green; width: 18px; height: 18px; border-radius: 50%; }
         #data-table-container { margin-top: 20px; }
+        button {
+            background-color: #808080; /* Grey background for inactive state */
+            color: black; /* Black text color */
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 4px;
+            transition: background-color 0.3s; /* Transition for color change */
+        }
 
-       
+        button.active {
+            background-color: #4CAF50; /* Green background for active state */
+        }
+
+        button:hover {
+            background-color: #45a049; /* Darker green on hover */
+        }
+        
+        .mode-button {
+            display: block;
+            margin: 5px 0;
+            padding: 5px 10px;
+            background-color: #f4f4f4;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .mode-button.active {
+            background-color: #8cc84b; /* Active state color */
+        }
+
+        .info.legend {
+            padding: 6px 8px;
+            font: 14px Arial, sans-serif;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .info.legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        
+        .leaflet-control-layers {
+            position: absolute; bottom: 10px; left: 10px;
+            border: 2px solid #8cc84b; background: white;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65); border-radius: 5px; padding: 10px;
+            z-index: 1000; /* Ensures it is above the map layer */
+        }   
     </style>
 </head>
 <body>
-
-    <!-- Map Container -->
     <div id="map"></div>
-
-    <!-- Data Table Container -->
     <div id="data-table-container"></div>
+    <div class="leaflet-control-layers">
 
-    <!-- JavaScript for initializing the map and displaying the table -->
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var map = L.map('map').setView([50.8503, 4.3517], 5); // Centered on Brussels, Belgium; Zoom level adjusted
+            var map = L.map('map').setView([50.8503, 4.3517], 5);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
+            
+            var modeButtons = {};
+            var cities = {};
+            var modesFilter = {};
+            var icons = {
+                'Bike Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: blue;"></div>' }),
+                'Car Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: red;"></div>' }),
+                'Scooter Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: yellow;"></div>' }),
+                'Moped Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: green;"></div>' }),
+                'Cargo Bike Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: orange;"></div>' })
+            };
 
-            var cityMarkers = L.layerGroup().addTo(map);
-            var greenIcon = L.divIcon({ className: 'custom-icon' });
+            var legend = L.control({position: 'topleft'});
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend');
+                var modes = Object.keys(modesFilter);
+                div.innerHTML = '<h4>Shared Mobility Map EU</h4> <br> Department of Transport and <br>Regional Economics <br><br> University of Antwerp';
+                modes.forEach(function(mode) {
+                    div.innerHTML += `<i style="background:${getModeColor(mode)};"></i> ${mode}<br>`;
+                });
+                return div;
+            };
+            legend.addTo(map);
+               
+            // Survey
+            var otherLegend = L.control({position: 'bottomright'});
+            otherLegend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend');
+                div.innerHTML = 'If you have any suggestions <br> to improve the map, please click <br> on the  following link:<br>';
+                // Adding a clickable link
+                div.innerHTML += '<a href="https://forms.office.com/e/Q3jSHHgCT2" target="_blank" style="color: blue; text-decoration: underline;">Link to Provide Feedback</a>';
+                return div;
+            };
+            otherLegend.addTo(map);
+
+
+            function getIconForMode(mode) {
+                return icons[mode] || L.divIcon({className: 'custom-icon'}); // Default icon
+            }
 
             function addMarkersFromCSV(csvData) {
                 Papa.parse(csvData, {
                     header: true,
-                    delimiter: ',', // Specify delimiter used in your CSV
+                    delimiter: ',', // Check your CSV delimiter
                     dynamicTyping: true,
                     complete: function (results) {
                         var data = results.data;
-                        var cities = {};
 
                         data.forEach(function(row) {
                             var city = row.City;
@@ -65,36 +151,67 @@
 
                             if (!cities[city]) {
                                 cities[city] = {
+                                    coordinates: [latitude, longitude],
                                     modes: {},
-                                    coordinates: [latitude, longitude]
+                                    marker: L.marker([latitude, longitude], {icon: getIconForMode(mode)})
                                 };
+                                cities[city].marker.addTo(map);
                             }
+
                             if (!cities[city].modes[mode]) {
                                 cities[city].modes[mode] = [];
+                                if (!modesFilter[mode]) {
+                                    modesFilter[mode] = true; // Initially set all modes to visible
+                                    createModeButton(mode);
+                                }
                             }
+
                             cities[city].modes[mode].push(`${operator} (${operationalModel})`);
+                            updatePopup(city); // Initially update all popups
                         });
-
-                        for (var city in cities) {
-                            var modesInfo = "";
-                            for (var mode in cities[city].modes) {
-                                modesInfo += `<b>${mode}:</b><br>`;
-                                cities[city].modes[mode].forEach(function(operatorModel) {
-                                    modesInfo += `- ${operatorModel}<br>`;
-                                });
-                            }
-
-                            var marker = L.marker(cities[city].coordinates, {icon: greenIcon}).bindPopup(`
-                                <b>${city}</b><br>
-                                ${modesInfo}
-                            `);
-
-                            marker.addTo(cityMarkers);
-                        }
                     }
                 });
             }
 
+            function createModeButton(mode) {
+                var button = document.createElement('button');
+                button.textContent = mode;
+                button.onclick = function() {
+                    toggleMode(mode, button);
+                };
+                button.className = 'mode-button'; // Set class for styling
+                document.querySelector('.leaflet-control-layers').appendChild(button);
+                modeButtons[mode] = button; // Track button by mode
+            }
+
+            function toggleMode(mode, button) {
+                modesFilter[mode] = !modesFilter[mode];
+                Object.keys(cities).forEach(function(city) {
+                    updatePopup(city);
+                });
+                button.classList.toggle('active', modesFilter[mode]);
+            }
+            
+            function updatePopup(city) {
+                var modesInfo = "";
+                var visible = false;
+                Object.keys(cities[city].modes).forEach(function(mode) {
+                    if (modesFilter[mode]) {
+                        visible = true;
+                        modesInfo += `<b>${mode}:</b><br>`;
+                        cities[city].modes[mode].forEach(function(detail) {
+                            modesInfo += `- ${detail}<br>`;
+                        });
+                    }
+                });
+                cities[city].marker.bindPopup(`<b>${city}</b><br>${modesInfo}`);
+                if (visible) {
+                    cities[city].marker.addTo(map);
+                } else {
+                    map.removeLayer(cities[city].marker);
+                }
+            }
+                            
             function fetchAndAddMarkersFromCSV() {
                 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
                 fetch(csvUrl)
