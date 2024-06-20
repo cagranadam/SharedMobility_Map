@@ -37,7 +37,13 @@
 
     <!-- CSS for map height and other styles -->
     <style>
-        #map { height: 620px; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }       
+        
+        #map { height: 100%; width: 100%;}
         .custom-icon { background-color: green; width: 18px; height: 18px; border-radius: 50%; }
         
         .leaflet-control-layers {
