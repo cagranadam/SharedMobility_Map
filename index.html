@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shared mobility data EU</title>
+    <title>Shared Mobility Data EU</title>
     
     <!-- Include Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""/>
-
+    
     <!-- Include Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -18,48 +18,38 @@
     <!-- Include PapaParse library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
+    <!-- Modal for displaying city information -->
+    <div id="city-info-modal">
+        <button class="close-modal-x" onclick="closeModal()">x</button>
+        <button onclick="window.open('https://docs.google.com/spreadsheets/d/15uH6UtMXNv1Dy05_lBXuR2wdumAZeEjw/edit?usp=sharing&ouid=101077609368645167402&rtpof=true&sd=true', '_blank')" class="edit-table-button">Edit table</button>
+        <div id="city-info-content">
+            <div class="scroll-container">
+                <!-- Table content will be inserted here -->
+                <table>
+                    <!-- Your table content -->
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+
+
     <!-- CSS for map height and other styles -->
     <style>
         #map { height: 620px; }
         .custom-icon { background-color: green; width: 18px; height: 18px; border-radius: 50%; }
-        #data-table-container { margin-top: 20px; }
-        button {
-            background-color: #808080; /* Grey background for inactive state */
-            color: black; /* Black text color */
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-right: 4px;
-            transition: background-color 0.3s; /* Transition for color change */
-        }
-
-        button.active {
-            background-color: #4CAF50; /* Green background for active state */
-        }
-
-        button:hover {
-            background-color: #45a049; /* Darker green on hover */
-        }
         
-        .mode-button {
-            display: block;
-            margin: 5px 0;
-            padding: 5px 10px;
-            background-color: #f4f4f4;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .mode-button.active {
-            background-color: #8cc84b; /* Active state color */
+        .leaflet-control-layers {
+            position: absolute; bottom: 10px; left: 10px;
+            border: 2px solid #8cc84b; background: white;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65); border-radius: 5px; padding: 10px;
+            z-index: 1000;
         }
 
         .info.legend {
             padding: 6px 8px;
             font: 14px Arial, sans-serif;
-            background: white;
             background: rgba(255, 255, 255, 0.8);
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
             border-radius: 5px;
@@ -72,116 +62,193 @@
             margin-right: 8px;
             opacity: 0.7;
         }
+
+        .mode-button {
+            display: block;
+            margin: 5px 0;
+            padding: 5px 10px;
+            background-color: #808080;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .mode-button.active {
+            background-color: #8cc84b;
+        }
         
-        .leaflet-control-layers {
-            position: absolute; bottom: 10px; left: 10px;
-            border: 2px solid #8cc84b; background: white;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.65); border-radius: 5px; padding: 10px;
-            z-index: 1000; /* Ensures it is above the map layer */
-        }   
+        button {
+            background-color: #808080;
+            color: black;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 4px;
+            transition: background-color 0.3s;
+        }
+
+        button.active {
+            background-color: #4CAF50;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        #city-info-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        #city-info-content {
+            position: relative;
+            margin-top: 60px;
+        }
+
+        .scroll-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            position: relative;
+            white-space: nowrap;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .scroll-container::-webkit-scrollbar {
+            height: 12px;
+        }
+
+        .scroll-container::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 10px;
+        }
+
+        .scroll-container::-webkit-scrollbar-track {
+            background-color: #f1f1f1;
+        }
+
+        .close-modal-x,
+        .edit-table-button {
+            position: absolute;
+            top: 10px;
+            padding: 10px 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .close-modal-x {
+            right: 10px;
+            background-color: #4CAF50;
+        }
+
+        .edit-table-button {
+            right: 100px;
+            background-color: #008CBA;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div id="data-table-container"></div>
-    <div class="leaflet-control-layers">
+    <div class="leaflet-control-layers"></div>
 
-    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var map = L.map('map').setView([50.8503, 4.3517], 5);
+            var map = L.map('map').setView([50.8503, 4.3517], 4);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
-            
+
             var modeButtons = {};
             var cities = {};
             var modesFilter = {};
             var icons = {
-                'Bike Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: blue;"></div>' }),
-                'Car Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: red;"></div>' }),
-                'Scooter Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: yellow;"></div>' }),
-                'Moped Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: green;"></div>' }),
-                'Cargo Bike Sharing': L.divIcon({ className: 'custom-icon', html: '<div style="background-color: orange;"></div>' })
+                'Bike Sharing': L.divIcon({ className: 'custom-icon bike' }),
+                'Car Sharing': L.divIcon({ className: 'custom-icon car' }),
+                'Scooter Sharing': L.divIcon({ className: 'custom-icon scooter' }),
+                'Moped Sharing': L.divIcon({ className: 'custom-icon moped' }),
+                'Cargo Bike Sharing': L.divIcon({ className: 'custom-icon cargo' })
             };
-
-            var legend = L.control({position: 'topleft'});
-            legend.onAdd = function (map) {
-                var div = L.DomUtil.create('div', 'info legend');
-                var modes = Object.keys(modesFilter);
-                div.innerHTML = '<h4>Shared Mobility Map EU</h4> <br> Department of Transport and <br>Regional Economics <br><br> University of Antwerp';
-                modes.forEach(function(mode) {
-                    div.innerHTML += `<i style="background:${getModeColor(mode)};"></i> ${mode}<br>`;
-                });
-                return div;
-            };
-            legend.addTo(map);
-               
-            // Survey
-            var otherLegend = L.control({position: 'bottomright'});
-            otherLegend.onAdd = function (map) {
-                var div = L.DomUtil.create('div', 'info legend');
-                div.innerHTML = 'If you have any suggestions <br> to improve the map, please click <br> on the  following link:<br>';
-                // Adding a clickable link
-                div.innerHTML += '<a href="https://forms.office.com/e/Q3jSHHgCT2" target="_blank" style="color: blue; text-decoration: underline;">Link to Provide Feedback</a>';
-                return div;
-            };
-            otherLegend.addTo(map);
-
 
             function getIconForMode(mode) {
-                return icons[mode] || L.divIcon({className: 'custom-icon'}); // Default icon
+                return icons[mode] || L.divIcon({ className: 'custom-icon' });
             }
 
-            function addMarkersFromCSV(csvData) {
-                Papa.parse(csvData, {
-                    header: true,
-                    delimiter: ',', // Check your CSV delimiter
-                    dynamicTyping: true,
-                    complete: function (results) {
-                        var data = results.data;
+            function createLegend() {
+                var legend = L.control({ position: 'topleft' });
+                legend.onAdd = function () {
+                    var div = L.DomUtil.create('div', 'info legend');
+                    div.innerHTML = '<h4>Shared Mobility Map EU</h4><br>Department of Transport and <br>Regional Economics <br><br>University of Antwerp';
+                    return div;
+                };
+                legend.addTo(map);
+            }
 
-                        data.forEach(function(row) {
-                            var city = row.City;
-                            var latitude = parseFloat(row.Latitude);
-                            var longitude = parseFloat(row.Longitude);
-                            var mode = row.Mode;
-                            var operator = row['Operator/Service provider'];
-                            var operationalModel = row['Operational model'];
-
-                            if (!cities[city]) {
-                                cities[city] = {
-                                    coordinates: [latitude, longitude],
-                                    modes: {},
-                                    marker: L.marker([latitude, longitude], {icon: getIconForMode(mode)})
-                                };
-                                cities[city].marker.addTo(map);
-                            }
-
-                            if (!cities[city].modes[mode]) {
-                                cities[city].modes[mode] = [];
-                                if (!modesFilter[mode]) {
-                                    modesFilter[mode] = true; // Initially set all modes to visible
-                                    createModeButton(mode);
-                                }
-                            }
-
-                            cities[city].modes[mode].push(`${operator} (${operationalModel})`);
-                            updatePopup(city); // Initially update all popups
-                        });
-                    }
-                });
+            function createSurveyLink() {
+                var surveyLegend = L.control({ position: 'bottomright' });
+                surveyLegend.onAdd = function () {
+                    var div = L.DomUtil.create('div', 'info legend');
+                    div.innerHTML = 'If you have any suggestions to improve the map, please click the following link:<br>';
+                    div.innerHTML += '<a href="https://forms.office.com/e/Q3jSHHgCT2" target="_blank" style="color: blue; text-decoration: underline;">Provide Feedback</a>';
+                    return div;
+                };
+                surveyLegend.addTo(map);
             }
 
             function createModeButton(mode) {
                 var button = document.createElement('button');
                 button.textContent = mode;
+                button.className = 'mode-button active';
                 button.onclick = function() {
                     toggleMode(mode, button);
                 };
-                button.className = 'mode-button'; // Set class for styling
                 document.querySelector('.leaflet-control-layers').appendChild(button);
-                modeButtons[mode] = button; // Track button by mode
+                modeButtons[mode] = button;
+                modesFilter[mode] = true;
             }
 
             function toggleMode(mode, button) {
@@ -191,7 +258,7 @@
                 });
                 button.classList.toggle('active', modesFilter[mode]);
             }
-            
+
             function updatePopup(city) {
                 var modesInfo = "";
                 var visible = false;
@@ -204,29 +271,112 @@
                         });
                     }
                 });
-                cities[city].marker.bindPopup(`<b>${city}</b><br>${modesInfo}`);
+
+                // Add the hyperlink for the city to open the modal
+                var cityLink = `<br><a href="#" onclick="showCityInfo('${city}')" style="color: blue; text-decoration: underline;">More data for ${city}</a>`;
+
+                cities[city].marker.bindPopup(`<b>${city}</b><br>${modesInfo}${cityLink}`);
                 if (visible) {
                     cities[city].marker.addTo(map);
                 } else {
                     map.removeLayer(cities[city].marker);
                 }
             }
-                            
-            function fetchAndAddMarkersFromCSV() {
+
+            // Function to open the modal and populate it with all CSV information
+            window.showCityInfo = function(city) {
                 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
                 fetch(csvUrl)
                     .then(response => response.text())
                     .then(csvData => {
-                        addMarkersFromCSV(csvData);
+                        Papa.parse(csvData, {
+                            header: true,
+                            dynamicTyping: true,
+                            complete: function (results) {
+                                var data = results.data;
+                                var cityInfo = data.map(row => {
+                                    return `<tr><td>${row['City']}</td><td>${row['Country']}</td><td>${row['Latitude']}</td><td>${row['Longitude']}</td><td>${row['Operator/Service provider']}</td><td>${row['Mode']}</td><td>${row['Operational model']}</td><td>${row['Public or private involvement']}</td><td>${row['Founded in country']}</td><td>${row['Official company name']}</td><td>${row['Entry Date']}</td><td>${row['Begin date of scheme']}</td><td>${row['End date of scheme']}</td><td>${row['Remarks']}</td><td>${row['Population']}</td><td>${row['Land Area']}</td><td>${row['Population Density']}</td><td>${row['GDP per capita']}</td><td>${row['Proportion of Families']}</td><td>${row['Young Age (15-34) proportion']}</td><td>${row['Middle Age (35-54) Proportion']}</td><td>${row['Share of students in higher education (per 1000persons)']}</td><td>${row['Proportion of persons with higher education (%)']}</td><td>${row['Tourists']}</td><td>${row['Number of registered cars (per 1000 persons)']}</td><td>${row['Cycle network per capita']}</td><td>${row['Cycle network density']}</td><td>${row['Elevation']}</td><td>${row['Precipitation']}</td><td>${row['Temperature']}</td></tr>`;
+                                }).join('');
+
+                                var table = `<table><thead><tr><th>City</th><th>Country</th><th>Latitude</th><th>Longitude</th><th>Operator/Service provider</th><th>Mode</th><th>Operational model</th><th>Public or private involvement</th><th>Founded in country</th><th>Official company name</th><th>Entry Date</th><th>Begin date of scheme</th><th>End date of scheme</th><th>Remarks</th><th>Population</th><th>Land Area</th><th>Population Density</th><th>GDP per capita</th><th>Proportion of Families</th><th>Young Age (15-34) proportion</th><th>Middle Age (35-54) Proportion</th><th>Share of students in higher education (per 1000persons)</th><th>Proportion of persons with higher education (%)</th><th>Tourists</th><th>Number of registered cars (per 1000 persons)</th><th>Cycle network per capita</th><th>Cycle network density</th><th>Elevation</th><th>Precipitation</th><th>Temperature</th></tr></thead><tbody>${cityInfo}</tbody></table>`;
+
+                                document.getElementById('city-info-content').innerHTML = table;
+                                document.getElementById('city-info-modal').style.display = 'block';
+                            }
+                        });
                     })
+                    .catch(error => {
+                        console.error('Error fetching CSV:', error);
+                        document.getElementById('city-info-content').innerHTML = '<p>Error loading data.</p>';
+                        document.getElementById('city-info-modal').style.display = 'block';
+                    });
+            }
+
+            // Function to close the modal
+            window.closeModal = function() {
+                document.getElementById('city-info-modal').style.display = 'none';
+            }
+
+            function addMarkersFromCSV(csvData) {
+                Papa.parse(csvData, {
+                    header: true,
+                    dynamicTyping: true,
+                    complete: function (results) {
+                        var data = results.data;
+                        data.forEach(function(row) {
+                            var city = row.City;
+                            var latitude = parseFloat(row.Latitude);
+                            var longitude = parseFloat(row.Longitude);
+                            var mode = row.Mode;
+                            var operator = row['Operator/Service provider'];
+                            var operationalModel = row['Operational model'];
+
+                            if (!cities[city]) {
+                                cities[city] = {
+                                    coordinates: [latitude, longitude],
+                                    modes: {},
+                                    marker: L.marker([latitude, longitude], { icon: getIconForMode(mode) })
+                                };
+                                cities[city].marker.addTo(map);
+                            }
+
+                            if (!cities[city].modes[mode]) {
+                                cities[city].modes[mode] = [];
+                                if (!modesFilter[mode]) {
+                                    modesFilter[mode] = true;
+                                    createModeButton(mode);
+                                }
+                            }
+
+                            cities[city].modes[mode].push(`${operator} (${operationalModel})`);
+                            updatePopup(city);
+                        });
+                    }
+                });
+            }
+
+            // Ensure the function to close the modal is present
+            function closeModal() {
+            document.getElementById('city-info-modal').style.display = 'none';
+            }
+
+            function fetchAndAddMarkersFromCSV() {
+                const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
+                fetch(csvUrl)
+                    .then(response => response.text())
+                    .then(csvData => addMarkersFromCSV(csvData))
                     .catch(error => {
                         console.error('Error fetching CSV:', error);
                         document.getElementById('data-table-container').innerHTML = '<p>Error loading data.</p>';
                     });
             }
 
+            createLegend();
+            createSurveyLink();
             fetchAndAddMarkersFromCSV();
         });
+
+
     </script>
 </body>
 </html>
