@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shared Mobility Data EU</title>
+    <title>Shared Mobility Map</title>
     
     <!-- Include Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -19,7 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <!-- Modal for displaying city information -->
-    <div id="city-info-modal">
+    <div id="city-info-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 600px; padding: 20px; background-color: white; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); z-index: 10000;">
         <button class="close-modal-x" onclick="closeModal()">x</button>
         <button onclick="window.open('https://docs.google.com/spreadsheets/d/15uH6UtMXNv1Dy05_lBXuR2wdumAZeEjw/edit?usp=sharing&ouid=101077609368645167402&rtpof=true&sd=true', '_blank')" class="edit-table-button">Edit table</button>
         <div id="city-info-content">
@@ -228,7 +228,7 @@
                 var legend = L.control({ position: 'topleft' });
                 legend.onAdd = function () {
                     var div = L.DomUtil.create('div', 'info legend');
-                    div.innerHTML = '<h4>Shared Mobility Map EU</h4><br>Department of Transport and <br>Regional Economics <br><br>University of Antwerp';
+                    div.innerHTML = '<h4>Shared Mobility Map </h4><br>Department of Transport and <br>Regional Economics <br><br>University of Antwerp';
                     return div;
                 };
                 legend.addTo(map);
@@ -238,12 +238,13 @@
                 var surveyLegend = L.control({ position: 'bottomright' });
                 surveyLegend.onAdd = function () {
                     var div = L.DomUtil.create('div', 'info legend');
-                    div.innerHTML = 'If you have any suggestions to improve the map, please click the following link:<br>';
-                    div.innerHTML += '<a href="https://forms.office.com/e/Q3jSHHgCT2" target="_blank" style="color: blue; text-decoration: underline;">Provide Feedback</a>';
+                    div.innerHTML = 'When using this data, please cite: <a href="https://doi.org/10.1016/j.jtrangeo.2024.103918" target="_blank" style="color: blue; text-decoration: underline;">https://doi.org/10.1016/j.jtrangeo.2024.103918</a>. <br>';
+                    div.innerHTML += 'If you have any suggestions to improve the map, please click the following link: <a href="https://forms.office.com/e/Q3jSHHgCT2" target="_blank" style="color: blue; text-decoration: underline;">Provide Feedback</a>';
                     return div;
                 };
                 surveyLegend.addTo(map);
             }
+
 
             function createModeButton(mode) {
                 var button = document.createElement('button');
@@ -273,7 +274,7 @@
                         visible = true;
                         modesInfo += `<b>${mode}:</b><br>`;
                         cities[city].modes[mode].forEach(function(detail) {
-                            modesInfo += `- ${detail}<br>`;
+                            modesInfo += `- <a href="#" onclick="showProviderInfo('${detail.split(' ')[0]}')" style="color: blue; text-decoration: underline;">${detail}</a><br>`;
                         });
                     }
                 });
@@ -287,9 +288,52 @@
                 } else {
                     map.removeLayer(cities[city].marker);
                 }
+
+                    window.showProviderInfo = function(provider) {
+                        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
+                        fetch(csvUrl)
+                            .then(response => response.text())
+                            .then(csvData => {
+                                Papa.parse(csvData, {
+                                    header: true,
+                                    dynamicTyping: true,
+                                    complete: function (results) {
+                                        var data = results.data;
+                                        var providerData = data.filter(row => row['Operator/Service provider'] === provider);
+                                        var providerInfo = providerData.map(row => {
+                                            return `<tr>
+                                                <td>${row['City']}</td>
+                                                <td>${row['Country']}</td>
+                                                <td>${row['Operator/Service provider']}</td>
+                                                <td>${row['Mode']}</td>
+                                                <td>${row['Operational model']}</td>
+                                            </tr>`;
+                                        }).join('');
+
+                                        var table = `<table><thead><tr>
+                                            <th>City</th>
+                                            <th>Country</th>
+                                            <th>Operator/Service provider</th>
+                                            <th>Mode</th>
+                                            <th>Operational model</th>
+                                        </tr></thead><tbody>${providerInfo}</tbody></table>`;
+
+                                        document.getElementById('city-info-content').innerHTML = table;
+                                        document.getElementById('city-info-modal').style.display = 'block';
+                                    }
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Error fetching CSV:', error);
+                                document.getElementById('city-info-content').innerHTML = '<p>Error loading data.</p>';
+                                document.getElementById('city-info-modal').style.display = 'block';
+                            });
+                    }
+
+
+
             }
 
-            // Function to open the modal and populate it with all CSV information
             window.showCityInfo = function(city) {
                 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
                 fetch(csvUrl)
@@ -300,11 +344,34 @@
                             dynamicTyping: true,
                             complete: function (results) {
                                 var data = results.data;
-                                var cityInfo = data.map(row => {
-                                    return `<tr><td>${row['City']}</td><td>${row['Country']}</td><td>${row['Latitude']}</td><td>${row['Longitude']}</td><td>${row['Operator/Service provider']}</td><td>${row['Mode']}</td><td>${row['Operational model']}</td><td>${row['Public or private involvement']}</td><td>${row['Founded in country']}</td><td>${row['Official company name']}</td><td>${row['Entry Date']}</td><td>${row['Begin date of scheme']}</td><td>${row['End date of scheme']}</td><td>${row['Remarks']}</td><td>${row['Population']}</td><td>${row['Land Area']}</td><td>${row['Population Density']}</td><td>${row['GDP per capita']}</td><td>${row['Proportion of Families']}</td><td>${row['Young Age (15-34) proportion']}</td><td>${row['Middle Age (35-54) Proportion']}</td><td>${row['Share of students in higher education (per 1000persons)']}</td><td>${row['Proportion of persons with higher education (%)']}</td><td>${row['Tourists']}</td><td>${row['Number of registered cars (per 1000 persons)']}</td><td>${row['Cycle network per capita']}</td><td>${row['Cycle network density']}</td><td>${row['Elevation']}</td><td>${row['Precipitation']}</td><td>${row['Temperature']}</td></tr>`;
+                                var cityData = data.filter(row => row['City'] === city);
+                                var cityInfo = cityData.map(row => {
+                                    return `<tr>
+                                        <td>${row['City']}</td>
+                                        <td>${row['Country']}</td>
+                                        <td><a href="#" onclick="showProviderInfo('${row['Operator/Service provider']}')">${row['Operator/Service provider']}</a></td>
+                                        <td>${row['Mode']}</td>
+                                        <td>${row['Operational model']}</td>
+                                        <td>${row['Public or private involvement']}</td>
+                                        <td>${row['Founded in country']}</td>
+                                        <td>${row['Official company name']}</td>
+                                        <td>${row['Begin date of scheme']}</td>
+                                        <td>${row['End date of scheme']}</td>
+                                    </tr>`;
                                 }).join('');
 
-                                var table = `<table><thead><tr><th>City</th><th>Country</th><th>Latitude</th><th>Longitude</th><th>Operator/Service provider</th><th>Mode</th><th>Operational model</th><th>Public or private involvement</th><th>Founded in country</th><th>Official company name</th><th>Entry Date</th><th>Begin date of scheme</th><th>End date of scheme</th><th>Remarks</th><th>Population</th><th>Land Area</th><th>Population Density</th><th>GDP per capita</th><th>Proportion of Families</th><th>Young Age (15-34) proportion</th><th>Middle Age (35-54) Proportion</th><th>Share of students in higher education (per 1000persons)</th><th>Proportion of persons with higher education (%)</th><th>Tourists</th><th>Number of registered cars (per 1000 persons)</th><th>Cycle network per capita</th><th>Cycle network density</th><th>Elevation</th><th>Precipitation</th><th>Temperature</th></tr></thead><tbody>${cityInfo}</tbody></table>`;
+                                var table = `<table><thead><tr>
+                                    <th>City</th>
+                                    <th>Country</th>
+                                    <th>Operator/Service provider</th>
+                                    <th>Mode</th>
+                                    <th>Operational model</th>
+                                    <th>Public or private involvement</th>
+                                    <th>Founded in country</th>
+                                    <th>Official company name</th>
+                                    <th>Begin date of scheme</th>
+                                    <th>End date of scheme</th>
+                                </tr></thead><tbody>${cityInfo}</tbody></table>`;
 
                                 document.getElementById('city-info-content').innerHTML = table;
                                 document.getElementById('city-info-modal').style.display = 'block';
@@ -360,6 +427,50 @@
                     }
                 });
             }
+               
+            window.showProviderInfo = function(provider) {
+                const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO8-rpObUaLG4kgtBLeSD0YZf7dKwNxzXaqOT8L7DQQVBtYE2EsabrnK8mWlpnKg/pub?gid=1506700456&single=true&output=csv";
+                fetch(csvUrl)
+                    .then(response => response.text())
+                    .then(csvData => {
+                        Papa.parse(csvData, {
+                            header: true,
+                            dynamicTyping: true,
+                            complete: function (results) {
+                                var data = results.data;
+                                var providerData = data.filter(row => row['Operator/Service provider'] === provider);
+                                var providerInfo = providerData.map(row => {
+                                    return `<tr>
+                                        <td>${row['City']}</td>
+                                        <td>${row['Country']}</td>
+                                        <td>${row['Operator/Service provider']}</td>
+                                        <td>${row['Mode']}</td>
+                                        <td>${row['Operational model']}</td>
+                                    </tr>`;
+                                }).join('');
+
+                                var table = `<table><thead><tr>
+                                    <th>City</th>
+                                    <th>Country</th>
+                                    <th>Operator/Service provider</th>
+                                    <th>Mode</th>
+                                    <th>Operational model</th>
+                                </tr></thead><tbody>${providerInfo}</tbody></table>`;
+
+                                document.getElementById('city-info-content').innerHTML = table;
+                                document.getElementById('city-info-modal').style.display = 'block';
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching CSV:', error);
+                        document.getElementById('city-info-content').innerHTML = '<p>Error loading data.</p>';
+                        document.getElementById('city-info-modal').style.display = 'block';
+                    });
+            }
+
+
+
 
             // Ensure the function to close the modal is present
             function closeModal() {
